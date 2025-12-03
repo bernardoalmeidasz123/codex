@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Code34</title>
+    <style>
+      body { margin: 0; font-family: Arial, sans-serif; background: #0f172a; color: #e2e8f0; }
+      header { background: #111827; padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; }
+      header h1 { margin: 0; font-size: 20px; }
+      button { background: #22c55e; border: none; color: #0f172a; padding: 10px 14px; border-radius: 8px; cursor: pointer; font-weight: 700; }
+      button.secondary { background: #1f2937; color: #e2e8f0; border: 1px solid #334155; }
+      input, select, textarea { width: 100%; padding: 10px; margin: 6px 0; border-radius: 6px; border: 1px solid #334155; background: #0b1222; color: #e2e8f0; }
+      .container { max-width: 1200px; margin: 24px auto; padding: 0 20px; }
+      .card { background: #0b1222; border: 1px solid #1f2937; border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+      .row { display: flex; gap: 16px; flex-wrap: wrap; }
+      .course { flex: 1 1 280px; }
+      .badge { padding: 4px 8px; border-radius: 999px; font-size: 12px; border: 1px solid #334155; margin-left: 8px; }
+      .locked { color: #fbbf24; }
+      .sidebar { width: 260px; max-height: 600px; overflow-y: auto; background: #0b1222; border: 1px solid #1f2937; border-radius: 12px; padding: 12px; }
+      .exercise-btn { width: 100%; text-align: left; margin-bottom: 8px; background: #111827; color: #e2e8f0; border: 1px solid #1f2937; }
+      .completed { background: #0f172a; color: #22c55e; border-color: #22c55e; }
+      .layout { display: flex; gap: 16px; }
+      .admin-table { width: 100%; border-collapse: collapse; }
+      .admin-table th, .admin-table td { border: 1px solid #1f2937; padding: 8px; text-align: left; }
+      .pill { display: inline-block; padding: 4px 10px; border-radius: 999px; background: #1f2937; margin-right: 6px; }
+      .hero { background: linear-gradient(135deg, #0ea5e9, #6366f1); color: #0b1222; border-radius: 16px; padding: 24px; margin-bottom: 24px; }
+      .hero h2 { margin: 0 0 8px; }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+
+    <script type="module">
+      import React, { useEffect, useState } from "https://esm.sh/react@18";
+      import { createRoot } from "https://esm.sh/react-dom@18/client";
+
+      const API_URL = "http://localhost:4000";
+
+      async function api(path, options = {}, token) {
+        const headers = options.headers || {};
+        if (!(options.body instanceof FormData)) {
+          headers["Content-Type"] = "application/json";
+        }
+        if (token) headers["Authorization"] = "Bearer " + token;
+        const res = await fetch(API_URL + path, { ...options, headers });
+        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).message || "Erro");
+        return res.json();
+      }
+
+      function LoginForm({ onAuth }) {
+        const [mode, setMode] = useState("login");
+        const [name, setName] = useState("");
+        const [email, setEmail] = useState("");
+        const [password, setPassword] = useState("");
+        const [error, setError] = useState("");
+        const submit = async () => {
+          try {
+            setError("");
+            const body = mode === "register" ? { name, email, password } : { email, password };
+            const data = await api("/api/auth/" + mode, { method: "POST", body: JSON.stringify(body) });
+            onAuth(data);
+          } catch (e) {
+            setError(e.message);
+          }
+        };
+        return (
+          <div className="card" style={{ maxWidth: 420, margin: "40px auto" }}>
+            <h2>{mode === "login" ? "Entrar" : "Criar conta"}</h2>
+            {mode === "register" && <input placeholder="Nome" value={name} onChange={(e) => setName(e.target.value)} />}
+            <input placeholder="E-mail" value={email} onChange={(e) => setEmail(e.target.value)} />
+            <input placeholder="Senha" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+            {error && <p style={{ color: "#f87171" }}>{error}</p>}
+            <button onClick={submit}>{mode === "login" ? "Entrar" : "Registrar"}</button>
+            <p>
+              {mode === "login" ? "Não tem conta?" : "Já tem conta?"}{" "}
+              <a style={{ color: "#38bdf8", cursor: "pointer" }} onClick={() => setMode(mode === "login" ? "register" : "login")}>
+                {mode === "login" ? "Criar conta" : "Fazer login"}
+              </a>
+            </p>
+          </div>
+        );
+      }
+
+      function Courses({ token, user, onSelectCourse, onLogout }) {
+        const [courses, setCourses] = useState([]);
+        const [loading, setLoading] = useState(true);
+        const [error, setError] = useState("");
+
+        useEffect(() => {
+          api("/api/courses", {}, token)
+            .then((data) => {
+              setCourses(data.courses);
+              setLoading(false);
+            })
+            .catch((e) => {
+              setError(e.message);
+              setLoading(false);
+            });
+        }, [token]);
+
+        if (loading) return <div className="container">Carregando cursos...</div>;
+        if (error) return <div className="container">{error}</div>;
+
+        return (
+          <>
+            <header>
+              <h1>Code34</h1>
+              <div>
+                <span>{user.email}</span>
+                <button className="secondary" style={{ marginLeft: 12 }} onClick={onLogout}>
+                  Sair
+                </button>
+              </div>
+            </header>
+            <div className="container">
+              <div className="hero">
+                <h2>Aprenda na prática com 34 exercícios por linguagem</h2>
+                <p>Envie o comprovante de PIX e libere manualmente após aprovação. Admin tem acesso total.</p>
+              </div>
+              <div className="row">
+                {courses.map((course) => (
+                  <div key={course.id} className="card course">
+                    <h3>
+                      {course.name}{" "}
+                      {course.is_free ? (
+                        <span className="badge">Grátis</span>
+                      ) : (
+                        <span className="badge">{course.price ? `R$ ${course.price}` : "Pago"}</span>
+                      )}
+                    </h3>
+                    <p>{course.description}</p>
+                    <p>
+                      Status:{" "}
+                      <strong className={course.is_unlocked ? "" : "locked"}>
+                        {course.is_unlocked ? "Desbloqueado" : "Bloqueado"}
+                      </strong>
+                    </p>
+                    <button onClick={() => onSelectCourse(course)}>{course.is_unlocked ? "Entrar" : "Ver detalhes"}</button>
+                  </div>
+                ))}
+              </div>
+              {user.email === "bernardoalmeida01031981@gmail.com" && (
+                <div className="card">
+                  <h3>Painel Admin</h3>
+                  <button onClick={() => onSelectCourse({ admin: true })}>Ir para painel</button>
+                </div>
+              )}
+            </div>
+          </>
+        );
+      }
+
+      function CourseDetail({ course, token, onBack }) {
+        const [data, setData] = useState(null);
+        const [error, setError] = useState("");
+        const [selected, setSelected] = useState(null);
+        const [message, setMessage] = useState("");
+
+        useEffect(() => {
+          api(`/api/courses/${course.id}/exercises`, {}, token)
+            .then((res) => {
+              setData(res);
+              setSelected(res.exercises[0]);
+            })
+            .catch((e) => setError(e.message));
+        }, [course.id, token]);
+
+        const markDone = async (id) => {
+          await api(`/api/exercises/${id}/complete`, { method: "POST" }, token);
+          setData((prev) => ({
+            ...prev,
+            exercises: prev.exercises.map((ex) => (ex.id === id ? { ...ex, completed: true } : ex)),
+          }));
+          setMessage("Exercício marcado como concluído!");
+          setTimeout(() => setMessage(""), 2000);
+        };
+
+        if (error) {
+          return (
+            <div className="container">
+              <p>{error}</p>
+              {!course.is_unlocked && <p>Curso bloqueado. Compre para acessar.</p>}
+              <button onClick={onBack}>Voltar</button>
+            </div>
+          );
+        }
+
+        if (!data) return <div className="container">Carregando exercícios...</div>;
+
+        return (
+          <>
+            <header>
+              <h1>{course.name}</h1>
+              <button className="secondary" onClick={onBack}>
+                Voltar
+              </button>
+            </header>
+            <div className="container layout">
+              <div className="sidebar">
+                {data.exercises.map((ex) => (
+                  <button
+                    key={ex.id}
+                    className={`exercise-btn ${selected?.id === ex.id ? "selected" : ""} ${ex.completed ? "completed" : ""}`}
+                    onClick={() => setSelected(ex)}
+                  >
+                    #{ex.order} - {ex.title}
+                  </button>
+                ))}
+              </div>
+              <div className="card" style={{ flex: 1 }}>
+                {selected && (
+                  <>
+                    <h2>
+                      #{selected.order} {selected.title}
+                    </h2>
+                    <p>Dificuldade: {selected.difficulty}</p>
+                    <p>{selected.statement}</p>
+                    {selected.initial_code && <pre>{selected.initial_code}</pre>}
+                    <button onClick={() => markDone(selected.id)}>Marcar como concluído</button>
+                    {message && <p style={{ color: "#22c55e" }}>{message}</p>}
+                  </>
+                )}
+              </div>
+            </div>
+          </>
+        );
+      }
+
+      function Purchase({ course, token, onBack }) {
+        const [file, setFile] = useState(null);
+        const [status, setStatus] = useState("");
+        const submit = async () => {
+          if (!file) return setStatus("Envie o comprovante.");
+          const fd = new FormData();
+          fd.append("courseId", course.id);
+          fd.append("attachment", file);
+          try {
+            setStatus("Enviando...");
+            await api("/api/purchases", { method: "POST", body: fd }, token);
+            setStatus("Comprovante enviado! Aguarde aprovação manual.");
+          } catch (e) {
+            setStatus(e.message);
+          }
+        };
+        return (
+          <>
+            <header>
+              <h1>Pagamento PIX</h1>
+              <button className="secondary" onClick={onBack}>
+                Voltar
+              </button>
+            </header>
+            <div className="container card">
+              <h2>{course.name}</h2>
+              <p>Preço: R$ {course.price}</p>
+              <p>
+                Pague via PIX para a chave:
+                <br />
+                <code>Use a chave configurada no backend (env PIX_KEY)</code>
+              </p>
+              <p>Envie o comprovante abaixo para liberar manualmente:</p>
+              <input type="file" onChange={(e) => setFile(e.target.files[0])} />
+              <button onClick={submit}>Enviar comprovante</button>
+              {status && <p>{status}</p>}
+            </div>
+          </>
+        );
+      }
+
+      function AdminPanel({ token, onBack }) {
+        const [purchases, setPurchases] = useState([]);
+        const [statusFilter, setStatusFilter] = useState("PENDING");
+        const load = () => {
+          api(`/api/admin/purchases?status=${statusFilter}`, {}, token)
+            .then((data) => setPurchases(data.purchases))
+            .catch((e) => console.error(e));
+        };
+        useEffect(load, [statusFilter]);
+
+        const act = async (id, action) => {
+          await api(`/api/admin/purchases/${id}/${action}`, { method: "POST" }, token);
+          load();
+        };
+
+        return (
+          <>
+            <header>
+              <h1>Painel Admin</h1>
+              <button className="secondary" onClick={onBack}>
+                Voltar
+              </button>
+            </header>
+            <div className="container">
+              <div className="card">
+                <label>Status</label>
+                <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+                  <option value="PENDING">Pendentes</option>
+                  <option value="APPROVED">Aprovados</option>
+                  <option value="REJECTED">Rejeitados</option>
+                </select>
+              </div>
+              <div className="card">
+                <h3>Pagamentos</h3>
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Usuário</th>
+                      <th>Email</th>
+                      <th>Curso</th>
+                      <th>Data</th>
+                      <th>Status</th>
+                      <th>Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {purchases.map((p) => (
+                      <tr key={p.id}>
+                        <td>{p.id}</td>
+                        <td>{p.user_name}</td>
+                        <td>{p.user_email}</td>
+                        <td>{p.course_name}</td>
+                        <td>{p.created_at}</td>
+                        <td>{p.status}</td>
+                        <td>
+                          <a href={`${API_URL}/api/admin/purchases/${p.id}/attachment`} target="_blank">Comprovante</a>
+                          {p.status === "PENDING" && (
+                            <>
+                              <button style={{ marginLeft: 8 }} onClick={() => act(p.id, "approve")}>Aprovar</button>
+                              <button className="secondary" style={{ marginLeft: 4 }} onClick={() => act(p.id, "reject")}>Rejeitar</button>
+                            </>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </>
+        );
+      }
+
+      function App() {
+        const [token, setToken] = useState(localStorage.getItem("token") || "");
+        const [user, setUser] = useState(localStorage.getItem("user") ? JSON.parse(localStorage.getItem("user")) : null);
+        const [view, setView] = useState("courses");
+        const [selectedCourse, setSelectedCourse] = useState(null);
+
+        const onAuth = (data) => {
+          setToken(data.token);
+          setUser(data.user);
+          localStorage.setItem("token", data.token);
+          localStorage.setItem("user", JSON.stringify(data.user));
+          setView("courses");
+        };
+
+        const logout = () => {
+          localStorage.clear();
+          setToken("");
+          setUser(null);
+        };
+
+        if (!token || !user) return <LoginForm onAuth={onAuth} />;
+
+        if (view === "admin") return <AdminPanel token={token} onBack={() => setView("courses")} />;
+        if (view === "course" && selectedCourse) return <CourseDetail course={selectedCourse} token={token} onBack={() => setView("courses")} />;
+        if (view === "purchase" && selectedCourse) return <Purchase course={selectedCourse} token={token} onBack={() => setView("courses")} />;
+
+        return (
+          <Courses
+            token={token}
+            user={user}
+            onLogout={logout}
+            onSelectCourse={(c) => {
+              if (c.admin) return setView("admin");
+              if (c.is_unlocked) {
+                setSelectedCourse(c);
+                setView("course");
+              } else {
+                setSelectedCourse(c);
+                setView("purchase");
+              }
+            }}
+          />
+        );
+      }
+
+      createRoot(document.getElementById("root")).render(<App />);
+    </script>
+  </body>
+</html>
