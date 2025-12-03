@@ -31,11 +31,19 @@
   <body>
     <div id="root"></div>
 
-    <script type="module">
-      import React, { useEffect, useState } from "https://esm.sh/react@18";
-      import { createRoot } from "https://esm.sh/react-dom@18/client";
+    <!-- URL pública do backend (ajuste para o seu domínio no Zeabur) -->
+    <script>
+      window.API_URL = "https://codex.zeabur.internal";
+    </script>
 
-      const API_URL = "http://codex.zeabur.internal:8080";
+    <!-- React via UMD (evita falha de import de módulo em ambientes com restrição) -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script>
+      const { useEffect, useState } = React;
+      const createRoot = ReactDOM.createRoot;
+
+      const API_URL = window.API_URL || "http://localhost:4000";
 
       async function api(path, options = {}, token) {
         const headers = options.headers || {};
